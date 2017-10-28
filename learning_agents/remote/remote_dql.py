@@ -1,4 +1,4 @@
-from builtins import NotImplementedError
+from builtins import NotImplementedError, staticmethod
 
 from rl.callbacks import TrainIntervalLogger, CallbackList
 from rl.core import Agent
@@ -14,27 +14,29 @@ from learning_agents.adqn import ADQNAgent
 
 class AgentPersistenceManager(object):
 
-    def save_agent(self, agent:Agent, folder_path):
+    def save_agent(self, agent: Agent, folder_path):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         # At the moment, we exclusively consider adqn agents.
         assert isinstance(agent, ADQNAgent)
         return self.save_adqn_agent(folder_path, agent)
 
-    def save_adqn_agent(self, folder_path, adqn_agent:ADQNAgent):
+    @staticmethod
+    def save_adqn_agent(folder_path, adqn_agent: ADQNAgent):
         adqn_agent.model.save(folder_path + '/model.h5f')
 
+    @staticmethod
     def load_adqn_agent(folder_path, memory, action_provider, processor,
-                        nb_steps_warmup, target_model_update):
+                        nb_steps_warmup, target_model_update, policy):
         # load model
         model = keras.models.load_model(filepath=folder_path + '/model.h5f',
                                         custom_objects={'clipped_mse': clipped_mse, 'mean_q': mean_q})
         # TODO save parameters and set them as default.
         adqn_agent = ADQNAgent(model=model, memory=memory, action_provider=action_provider,
-                               window_length=1, policy=EpsGreedyQPolicy(), gamma=.99, batch_size=32,
+                               window_length=1, policy=policy, gamma=.99, batch_size=32,
                                nb_steps_warmup=nb_steps_warmup, train_interval=1, memory_interval=1,
                                target_model_update=target_model_update,
-                               delta_range=(-np.inf, np.inf),enable_double_dqn=True, custom_model_objects={},
+                               delta_range=(-np.inf, np.inf), enable_double_dqn=True, custom_model_objects={},
                                processor=processor)
         return adqn_agent
 
@@ -122,6 +124,7 @@ class RemoteAdqn(object):
         self.agent.training = True
         if self.episode_step == 0:
             self.callbacks.on_episode_begin(self.episode)
+        self.callbacks.on_step_begin(self.episode_step)
 
         # Is training ended yet?
         if agent.step >= self.no_training_steps:
@@ -155,9 +158,11 @@ class RemoteAdqn(object):
             self.episode += 1
             self.episode_step = 0
             self.episode_reward = 0
+
+            return
+
         else:
             self.episode_step += 1
-        self.callbacks.on_step_begin(self.episode_step)
         action = agent.forward(observation)
         agent.step += 1
 

@@ -12,11 +12,12 @@ class CartPoleActionProviderV2(ActionProvider):
     """
     do not drive in the direction the pole is falling.
     """
-    def actions(self, state):
-        pole_angle = state[0][2]
-        if pole_angle < -0.05:#-0.0872:
+    def actions(self, observation):
+        state = observation
+        pole_angle = state[2]
+        if pole_angle < -0.0872:
             return[Action([1])]
-        if pole_angle > 0.05:#0.0872:
+        if pole_angle > 0.0872:
             return[Action([0])]
         return [Action([0]), Action([1])]
 

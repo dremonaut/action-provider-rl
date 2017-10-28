@@ -6,26 +6,24 @@ from keras.models import Model
 from keras.optimizers import Adam
 from rl.memory import SequentialMemory
 
-from learning_agents.adfp import ADFPAgent, DecreasingEpsilonGreedyPolicy, DefaultMemory
-from examples.cartpole.cartpole_utils import CartPoleProcessor, CartPoleActionProvider
+from learning_agents.adfp import ADFPAgent, DecreasingEpsilonGreedyPolicy, DefaultMemory, Goal
+from examples.cartpole.cartpole_utils import CartPoleProcessor, CartPoleActionProvider, CartPoleActionProviderV2
 
 ENV_NAME = 'CartPole-v0'
 WINDOW_LENGTH = 1
 
+NB_TEMPORAL_OFFSETS = 4
 
-def reward_function(future_measurement_diffs, current_goal_params):
-    future_reward = 0
-    for idx, measurement in enumerate(future_measurement_diffs):
-        future_reward += current_goal_params[idx][0] * measurement[0]
-    return future_reward/len(future_measurement_diffs)
 
+def immediate_reward_function(measurement_diff, goal_params):
+    reward = goal_params[0] * measurement_diff[0]
+    return reward
+goal = Goal(nb_temporal_offsets=NB_TEMPORAL_OFFSETS, immediate_reward_function=immediate_reward_function)
 
 # Get the environment and extract the number of actions.
 env = gym.make(ENV_NAME)
 np.random.seed(123)
 env.seed(123)
-
-temporal_offset_count = 3
 
 inputs_observation = Input(shape=(5,))
 inputs_action = Input(shape=(1,))
@@ -37,7 +35,7 @@ hidden_1 = Dense(128, activation='relu')(merged)
 hidden_2 = Dense(128, activation='relu')(hidden_1)
 hidden_3 = Dense(64, activation='relu')(hidden_2)
 # output layer
-output = Dense(4, activation='linear')(hidden_3)
+output = Dense(NB_TEMPORAL_OFFSETS, activation='linear')(hidden_3)
 
 model = Model(inputs=[inputs_observation, inputs_action, inputs_goal], outputs=output)
 
@@ -47,8 +45,8 @@ optimizer = Adam(lr=1e-3)
 metrics = ['mae']
 
 adfp_agent = ADFPAgent(policy=DecreasingEpsilonGreedyPolicy(start_eps=1, end_eps=0, steps=1000),
-                       model=model, action_provider=CartPoleActionProvider(),
-                       memory=DefaultMemory(max_length=1000), goal_function=reward_function,
+                       model=model, action_provider=CartPoleActionProviderV2(),
+                       memory=DefaultMemory(max_length=1000), goal=goal,
                        temporal_offsets=[5, 10, 20, 30], default_measurements=[0])
 wrapper_agent = ADFPWrapperAgent(adfp_agent=adfp_agent, processor=CartPoleProcessor(),
                                  goal_params=[[0.2], [0.2], [0.5], [1]])

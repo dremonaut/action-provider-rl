@@ -1,6 +1,8 @@
 import numpy as np
 import random
+import os
 from rl.util import clone_model
+from keras.models import load_model
 
 
 class Observation(object):
@@ -9,8 +11,8 @@ class Observation(object):
     """
 
     def __init__(self, raw_features, measurements):
-        self.raw_features = raw_features
-        self.measurements = measurements
+        self.raw_features = np.array(raw_features)
+        self.measurements = np.array(measurements)
 
     def flatten(self):
         """
@@ -117,15 +119,35 @@ class DecreasingEpsilonGreedyPolicy(Policy):
         return action
 
 
-def process_future_measurement(present_observation, future_measurements):
+def future_measurement_diff(present_observation, future_measurements):
     future_measurement_diffs = [(future_measurement - present_observation.measurements)
                                 for future_measurement in future_measurements]
     return future_measurement_diffs
 
 
+class Goal(object):
+
+    def __init__(self, nb_temporal_offsets, immediate_reward_function,
+                 future_measurement_processor=future_measurement_diff):
+        self.nb_temporal_offsets = nb_temporal_offsets
+        self.immediate_reward_function = immediate_reward_function
+        self.future_measurement_processor = future_measurement_processor
+
+    def accumulated_reward(self, measurements, goal_params_vector):
+
+        assert len(measurements) == self.nb_temporal_offsets
+        assert len(goal_params_vector) == self.nb_temporal_offsets
+
+        reward = 0
+        for idx, measurement in enumerate(measurements):
+            reward += self.immediate_reward_function(measurement, goal_params_vector[idx])
+
+        return reward
+
+
 class ADFPAgent(object):
 
-    def __init__(self, policy, model, action_provider, memory, goal_function, temporal_offsets, batch_size=64,
+    def __init__(self, policy, model, action_provider, memory, goal: Goal, temporal_offsets, batch_size=64,
                  target_model_update=100, default_measurements=None):
         """
 
@@ -144,7 +166,7 @@ class ADFPAgent(object):
         self.memory = memory
         self.batch_size = batch_size
         self.temporal_offsets = temporal_offsets
-        self.goal_function = goal_function
+        self.goal = goal
         self.target_model = clone_model(self.model, {})
         self.step = 0
         self.target_model_update = target_model_update
@@ -216,7 +238,7 @@ class ADFPAgent(object):
     def select_action(self, observation, current_goal_params):
         # Obtain all possible actions
         action_candidates = self.action_provider.actions(observation.raw_features)
-        action_candidates_params = [action.params[0] for action in action_candidates]  # TODO Externalize processing
+        action_candidates_params = [action.params for action in action_candidates]
 
         #  Construct inputs for actions
         observation_batch = np.array([observation.flatten()] * len(action_candidates))
@@ -226,11 +248,10 @@ class ADFPAgent(object):
         # Use inputs for prediction
         future_measurement_diffs_per_action = self.target_model.predict_on_batch([observation_batch,
                                                                            action_batch, goal_param_batch])
-        # TODO verify that order is maintained
 
-        expected_action_qualities = np.array([self.goal_function(self.group_measurements(future_measurement_diffs),
-                                                        current_goal_params)
-                                     for future_measurement_diffs in future_measurement_diffs_per_action])
+        expected_action_qualities = np.array(
+            [self.goal.accumulated_reward(self.group_measurements(future_measurement_diffs), current_goal_params)
+             for future_measurement_diffs in future_measurement_diffs_per_action])
 
         # let policy choose
         chosen_action = action_candidates[self.policy.select_action(expected_action_qualities)]
@@ -246,10 +267,10 @@ class ADFPAgent(object):
 
         for e in experiences:
             observation_batch.append(e.observation.flatten())
-            action_batch.append(e.action.params[0])
+            action_batch.append(e.action.params)
             goal_param_batch.append(e.goal_params)
             future_measurement_diff_batch.append(
-                self.ungroup_measurements(process_future_measurement(e.observation, e.future_measurements)))
+                self.ungroup_measurements(self.goal.future_measurement_processor(e.observation, e.future_measurements)))
 
         return self.model.train_on_batch([np.array(observation_batch), np.array(action_batch),
                                           np.array(goal_param_batch)], np.array(future_measurement_diff_batch))
@@ -261,6 +282,7 @@ class ADFPAgent(object):
     def group_measurements(self, future_measurement_diffs):
         # [] to [[]*len(self.temporal_offsets)]
         measurement_length = int(len(future_measurement_diffs)/len(self.temporal_offsets))
+        assert measurement_length > 0
         transformed_list = []
         idx = 0
         while idx <= len(future_measurement_diffs) - measurement_length:
@@ -276,3 +298,23 @@ class ADFPAgent(object):
     @property
     def metrics_names(self):
         return self.model.metrics_names[:] # TODO use keras_rl policies + self.policy.metrics_names[:]
+
+    def save(self, folder_path):
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        # At the moment, we exclusively consider adqn agents.
+        self.model.save(folder_path + '/model.h5f')
+
+    def load_weights(self, filepath):
+        self.model.load_weights(filepath=filepath)
+        self.target_model.set_weights(self.model.get_weights())
+
+    @staticmethod
+    def load(folder_path, policy, action_provider, memory, goal, temporal_offsets, batch_size=64,
+             target_model_update=100, default_measurements=None):
+        model = load_model(filepath=folder_path + '/model.h5f')
+        adfp_agent = ADFPAgent(policy=policy, model=model, action_provider=action_provider, memory=memory,
+                               goal=goal, temporal_offsets=temporal_offsets, batch_size=batch_size,
+                               target_model_update=target_model_update, default_measurements=default_measurements)
+
+        return adfp_agent
