@@ -65,7 +65,9 @@ class RemoteAdfp(object):
             raw_observation = self.processor.process_observation(observation=raw_observation)
             measurement = self.processor.process_measurement(measurement)
 
-        reward = self.agent.goal.immediate_reward_function(measurement, goal_params[-1])
+        # If we have a list of goal_params just take one element for evaluation.
+        goal_params = goal_params if not isinstance(goal_params[0], list) else goal_params[-1]
+        reward = self.agent.goal.immediate_reward_function(measurement, goal_params)
 
         if self.step > 0:
             metrics = self.agent.backward(measurements=measurement, terminal=done)

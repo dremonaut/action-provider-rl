@@ -127,20 +127,33 @@ def future_measurement_diff(present_observation, future_measurements):
 
 class Goal(object):
 
-    def __init__(self, nb_temporal_offsets, immediate_reward_function,
+    def __init__(self, nb_temporal_offsets, immediate_reward_function, factors=None,
                  future_measurement_processor=future_measurement_diff):
         self.nb_temporal_offsets = nb_temporal_offsets
+        if factors is None:
+            self.factors = [1] * len(nb_temporal_offsets)
+        else:
+            assert len(factors) == self.nb_temporal_offsets
+            self.factors = factors
         self.immediate_reward_function = immediate_reward_function
         self.future_measurement_processor = future_measurement_processor
 
     def accumulated_reward(self, measurements, goal_params_vector):
+        """
+        :param measurements:
+        :param goal_params_vector: contains one goal params list per temporal offset. If only one goal params list
+        is given, it is automatically repeated to match temporal offset dimension.
+        :return:
+        """
 
         assert len(measurements) == self.nb_temporal_offsets
+        if not isinstance(goal_params_vector[0], list):
+            goal_params_vector = [goal_params_vector] * self.nb_temporal_offsets
         assert len(goal_params_vector) == self.nb_temporal_offsets
 
         reward = 0
         for idx, measurement in enumerate(measurements):
-            reward += self.immediate_reward_function(measurement, goal_params_vector[idx])
+            reward += self.factors[idx] * self.immediate_reward_function(measurement, goal_params_vector[idx])
 
         return reward
 

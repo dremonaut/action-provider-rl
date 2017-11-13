@@ -3,7 +3,7 @@ from setuptools import find_packages
 
 
 setup(name='action-provider-rl',
-      version='0.1.0',
+      version='0.1.1',
       description='Deep Reinforcement Learning using Action Providers',
       author='André Reichstaller',
       author_email='reichstaller@isse.de',
