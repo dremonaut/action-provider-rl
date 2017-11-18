@@ -66,8 +66,8 @@ class RemoteAdfp(object):
             measurement = self.processor.process_measurement(measurement)
 
         # If we have a list of goal_params just take one element for evaluation.
-        goal_params = goal_params if not isinstance(goal_params[0], list) else goal_params[-1]
-        reward = self.agent.goal.immediate_reward_function(measurement, goal_params)
+        eval_goal_params = goal_params if not isinstance(goal_params[0], list) else goal_params[-1]
+        reward = self.agent.goal.immediate_reward_function(measurement, eval_goal_params)
 
         if self.step > 0:
             metrics = self.agent.backward(measurements=measurement, terminal=done)
@@ -87,19 +87,16 @@ class RemoteAdfp(object):
             # report
             episode_logs = {
                 'episode_reward': self.episode_reward,
-                'nb_episode_steps': self.episode_step
+                'nb_episode_steps': self.episode_step,
+                'reward_per_episode': self.episode_reward / self.episode_step
             }
             self.callbacks.on_episode_end(self.episode, episode_logs)
 
             self.episode += 1
             self.episode_step = 0
-            self.episode_reward = 0
+            self.episode_reward = 0.
 
             return
-
-        else:
-            self.episode_step += 1
-            self.step += 1
 
         action = self.agent.forward(observation=Observation(raw_features=raw_observation, measurements=measurement),
                                     goal_params=goal_params)
@@ -132,3 +129,6 @@ class RemoteAdfp(object):
             # We are done here.
             self.callbacks.on_train_end()
             sys.exit(0)
+
+        self.episode_step += 1
+        self.step += 1

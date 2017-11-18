@@ -126,7 +126,9 @@ def future_measurement_diff(present_observation, future_measurements):
 
 
 class Goal(object):
-
+    """
+        TODO Include factors in goal_params.
+    """
     def __init__(self, nb_temporal_offsets, immediate_reward_function, factors=None,
                  future_measurement_processor=future_measurement_diff):
         self.nb_temporal_offsets = nb_temporal_offsets
