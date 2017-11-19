@@ -11,10 +11,6 @@ def visualize_log(filename, figsize=None, output=None):
         raise ValueError('Log file "{}" does not contain the "episode" key.'.format(filename))
     episodes = data['episode']
 
-    if 'nb_episode_steps' in data and 'episode_reward' in data:
-        data['reward_per_step'] = \
-            [reward/data['nb_episode_steps'][idx] for idx,reward in enumerate(data['episode_reward'])]
-
     # Get value keys. The x axis is shared and is the number of episodes.
     keys = sorted(list(set(data.keys()).difference(set(['episode']))))
 

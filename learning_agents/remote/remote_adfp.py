@@ -88,7 +88,7 @@ class RemoteAdfp(object):
             episode_logs = {
                 'episode_reward': self.episode_reward,
                 'nb_episode_steps': self.episode_step,
-                'reward_per_episode': self.episode_reward / self.episode_step
+                'reward_per_step': self.episode_reward / self.episode_step
             }
             self.callbacks.on_episode_end(self.episode, episode_logs)
 
