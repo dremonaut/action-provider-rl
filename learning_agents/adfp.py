@@ -133,7 +133,7 @@ class Goal(object):
                  future_measurement_processor=future_measurement_diff):
         self.nb_temporal_offsets = nb_temporal_offsets
         if factors is None:
-            self.factors = [1] * len(nb_temporal_offsets)
+            self.factors = [1] * nb_temporal_offsets
         else:
             assert len(factors) == self.nb_temporal_offsets
             self.factors = factors

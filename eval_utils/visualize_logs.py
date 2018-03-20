@@ -1,6 +1,7 @@
+import matplotlib
+matplotlib.use('Qt5Agg')
 import argparse
 import json
-
 import matplotlib.pyplot as plt
 
 

@@ -69,7 +69,7 @@ class RemoteAdfp(object):
         eval_goal_params = goal_params if not isinstance(goal_params[0], list) else goal_params[-1]
         reward = self.agent.goal.immediate_reward_function(measurement, eval_goal_params)
 
-        if self.step > 0:
+        if self.step > 1:
             metrics = self.agent.backward(measurements=measurement, terminal=done)
             step_logs = {
                 'action': self.recent_action,
