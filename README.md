@@ -1,5 +1,4 @@
-# action-provider-rl
-Deep Reinforcement Learning with Action Providers
+# Deep Reinforcement Learning with Action Providers
 
 # Installation
 * Clone repository to local folder.
